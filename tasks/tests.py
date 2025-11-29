@@ -29,7 +29,7 @@ class TestUrgencyScore(unittest.TestCase):
     def test_overdue_task_gets_high_urgency(self):
         """Overdue tasks should have urgency > 100."""
         past_due = date(2025, 11, 25)  # 4 days overdue
-        score, days, is_overdue = calculate_urgency_score(past_due, self.today)
+        score, days, is_overdue, _ = calculate_urgency_score(past_due, self.today)
         
         self.assertTrue(is_overdue)
         self.assertEqual(days, -4)
@@ -37,7 +37,7 @@ class TestUrgencyScore(unittest.TestCase):
     
     def test_due_today_gets_maximum_urgency(self):
         """Tasks due today should have maximum urgency (100)."""
-        score, days, is_overdue = calculate_urgency_score(self.today, self.today)
+        score, days, is_overdue, _ = calculate_urgency_score(self.today, self.today)
         
         self.assertFalse(is_overdue)
         self.assertEqual(days, 0)
@@ -46,7 +46,7 @@ class TestUrgencyScore(unittest.TestCase):
     def test_urgent_task_high_score(self):
         """Tasks due in 1-3 days should have high urgency (85-95)."""
         tomorrow = self.today + timedelta(days=1)
-        score, days, _ = calculate_urgency_score(tomorrow, self.today)
+        score, days, _, _ = calculate_urgency_score(tomorrow, self.today)
         
         self.assertEqual(days, 1)
         self.assertGreaterEqual(score, 85)
@@ -55,7 +55,7 @@ class TestUrgencyScore(unittest.TestCase):
     def test_week_away_moderate_urgency(self):
         """Tasks due in a week should have moderate urgency (50-70)."""
         next_week = self.today + timedelta(days=7)
-        score, days, _ = calculate_urgency_score(next_week, self.today)
+        score, days, _, _ = calculate_urgency_score(next_week, self.today)
         
         self.assertEqual(days, 7)
         self.assertGreaterEqual(score, 50)
@@ -64,7 +64,7 @@ class TestUrgencyScore(unittest.TestCase):
     def test_month_away_low_urgency(self):
         """Tasks due in a month should have low urgency (<30)."""
         next_month = self.today + timedelta(days=30)
-        score, days, _ = calculate_urgency_score(next_month, self.today)
+        score, days, _, _ = calculate_urgency_score(next_month, self.today)
         
         self.assertEqual(days, 30)
         self.assertLess(score, 30)
@@ -72,7 +72,7 @@ class TestUrgencyScore(unittest.TestCase):
     def test_far_future_minimum_urgency(self):
         """Tasks due far in future should have minimum urgency (>0)."""
         far_future = self.today + timedelta(days=365)
-        score, days, _ = calculate_urgency_score(far_future, self.today)
+        score, days, _, _ = calculate_urgency_score(far_future, self.today)
         
         self.assertGreater(score, 0)
         self.assertLess(score, 20)
@@ -421,6 +421,194 @@ class TestEdgeCases(unittest.TestCase):
         # Should not raise an exception
         result = calculate_priority_score(task, [task])
         self.assertIn('priority_score', result)
+
+
+class TestDateIntelligence(unittest.TestCase):
+    """Tests for weekend/holiday awareness in urgency calculation."""
+    
+    def test_working_days_excludes_weekends(self):
+        """Working days calculation should exclude weekends."""
+        from tasks.scoring import count_working_days, is_working_day
+        from datetime import date
+        
+        # Monday to Friday (same week) = 5 working days
+        monday = date(2025, 12, 1)   # Monday
+        friday = date(2025, 12, 5)   # Friday
+        
+        working_days = count_working_days(monday, friday)
+        # Mon, Tue, Wed, Thu, Fri = 5 working days
+        self.assertEqual(working_days, 5)
+        
+        # Friday to next Monday = 2 working days (Fri and Mon)
+        friday2 = date(2025, 12, 5)  # Friday
+        monday2 = date(2025, 12, 8)  # Monday
+        
+        working_days2 = count_working_days(friday2, monday2)
+        # Fri, Sat (skip), Sun (skip), Mon = 2 working days
+        self.assertEqual(working_days2, 2)
+    
+    def test_weekend_not_working_day(self):
+        """Saturday and Sunday should not be working days."""
+        from tasks.scoring import is_working_day
+        from datetime import date
+        
+        saturday = date(2025, 11, 29)
+        sunday = date(2025, 11, 30)
+        monday = date(2025, 12, 1)
+        
+        self.assertFalse(is_working_day(saturday))
+        self.assertFalse(is_working_day(sunday))
+        self.assertTrue(is_working_day(monday))
+    
+    def test_holiday_not_working_day(self):
+        """Holidays should not be working days."""
+        from tasks.scoring import is_working_day
+        from datetime import date
+        
+        christmas = date(2025, 12, 25)
+        new_year = date(2025, 1, 1)
+        
+        self.assertFalse(is_working_day(christmas))
+        self.assertFalse(is_working_day(new_year))
+
+
+class TestEisenhowerMatrix(unittest.TestCase):
+    """Tests for Eisenhower Matrix quadrant assignment."""
+    
+    def setUp(self):
+        self.today = date(2025, 11, 29)
+    
+    def test_urgent_important_task(self):
+        """Task due soon with high importance should be 'do_first'."""
+        task = {
+            'id': 'urgent-important',
+            'title': 'Critical',
+            'due_date': self.today,  # Due today = urgent
+            'estimated_hours': 2,
+            'importance': 9,  # High importance
+            'dependencies': []
+        }
+        result = calculate_priority_score(task, [task], today=self.today)
+        
+        self.assertEqual(result['eisenhower_quadrant'], 'do_first')
+        self.assertTrue(result['is_urgent'])
+        self.assertTrue(result['is_important'])
+    
+    def test_important_not_urgent_task(self):
+        """Task due far out with high importance should be 'schedule'."""
+        task = {
+            'id': 'schedule',
+            'title': 'Plan ahead',
+            'due_date': '2025-12-30',  # Far out
+            'estimated_hours': 4,
+            'importance': 8,  # High importance
+            'dependencies': []
+        }
+        result = calculate_priority_score(task, [task], today=self.today)
+        
+        self.assertEqual(result['eisenhower_quadrant'], 'schedule')
+        self.assertFalse(result['is_urgent'])
+        self.assertTrue(result['is_important'])
+    
+    def test_low_priority_task(self):
+        """Task not urgent and not important should be 'eliminate'."""
+        task = {
+            'id': 'low',
+            'title': 'Maybe someday',
+            'due_date': '2025-12-30',  # Far out
+            'estimated_hours': 4,
+            'importance': 3,  # Low importance
+            'dependencies': []
+        }
+        result = calculate_priority_score(task, [task], today=self.today)
+        
+        self.assertEqual(result['eisenhower_quadrant'], 'eliminate')
+
+
+class TestDependencyGraph(unittest.TestCase):
+    """Tests for dependency graph building."""
+    
+    def test_build_graph_with_dependencies(self):
+        """Should build correct graph structure."""
+        from tasks.scoring import build_dependency_graph
+        
+        tasks = [
+            {'id': 'A', 'title': 'Task A', 'dependencies': []},
+            {'id': 'B', 'title': 'Task B', 'dependencies': ['A']},
+            {'id': 'C', 'title': 'Task C', 'dependencies': ['A', 'B']},
+        ]
+        
+        graph = build_dependency_graph(tasks)
+        
+        self.assertEqual(graph['total_nodes'], 3)
+        self.assertEqual(graph['total_edges'], 3)  # A->B, A->C, B->C
+        self.assertFalse(graph['has_circular'])
+    
+    def test_graph_detects_circular(self):
+        """Should detect circular dependencies in graph."""
+        from tasks.scoring import build_dependency_graph
+        
+        tasks = [
+            {'id': 'A', 'title': 'Task A', 'dependencies': ['B']},
+            {'id': 'B', 'title': 'Task B', 'dependencies': ['A']},
+        ]
+        
+        graph = build_dependency_graph(tasks)
+        
+        self.assertTrue(graph['has_circular'])
+        self.assertTrue(any(node['in_cycle'] for node in graph['nodes']))
+
+
+class TestLearningSystem(unittest.TestCase):
+    """Tests for the learning system."""
+    
+    def test_record_feedback(self):
+        """Should record feedback and update statistics."""
+        from tasks.scoring import LearningSystem
+        
+        system = LearningSystem()
+        
+        task_data = {
+            '_scores': {'urgency': 80, 'importance': 70, 'effort': 50, 'dependency': 0},
+            'priority_score': 65
+        }
+        
+        stats = system.record_feedback(task_data, was_helpful=True)
+        
+        self.assertEqual(stats['total_feedback'], 1)
+        self.assertEqual(stats['helpful_count'], 1)
+        self.assertEqual(stats['helpful_rate'], 1.0)
+    
+    def test_weight_adjustments(self):
+        """Feedback should adjust weights over time."""
+        from tasks.scoring import LearningSystem
+        
+        system = LearningSystem()
+        base_weights = {'urgency': 0.35, 'importance': 0.30, 'effort': 0.20, 'dependency': 0.15}
+        
+        # Record several helpful feedbacks for high-urgency tasks
+        for _ in range(5):
+            system.record_feedback({
+                '_scores': {'urgency': 90, 'importance': 50, 'effort': 50, 'dependency': 50},
+                'priority_score': 70
+            }, was_helpful=True)
+        
+        adjusted = system.get_adjusted_weights(base_weights)
+        
+        # Urgency weight should have increased
+        self.assertGreater(adjusted['urgency'], base_weights['urgency'] - 0.05)
+    
+    def test_reset_learning(self):
+        """Should be able to reset learning data."""
+        from tasks.scoring import LearningSystem
+        
+        system = LearningSystem()
+        system.record_feedback({'_scores': {}, 'priority_score': 50}, True)
+        
+        stats = system.reset()
+        
+        self.assertEqual(stats['total_feedback'], 0)
+        self.assertEqual(stats['helpful_count'], 0)
 
 
 if __name__ == '__main__':
