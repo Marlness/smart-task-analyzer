@@ -196,8 +196,70 @@
                         <p id="summary-text"></p>
                     </div>
 
-                    <!-- Prioritized Tasks -->
-                    <div class="results-list" id="results-list"></div>
+                    <!-- View Toggle Tabs -->
+                    <div class="view-tabs">
+                        <button class="view-tab active" data-view="list">📋 Priority List</button>
+                        <button class="view-tab" data-view="matrix">📊 Eisenhower Matrix</button>
+                        <button class="view-tab" data-view="graph">🔗 Dependency Graph</button>
+                    </div>
+
+                    <!-- Learning System Stats -->
+                    <div class="learning-stats" id="learning-stats">
+                        <span class="learning-label">🧠 Learning:</span>
+                        <span id="feedback-stats">No feedback yet</span>
+                    </div>
+
+                    <!-- Priority List View -->
+                    <div class="view-content" id="list-view">
+                        <div class="results-list" id="results-list"></div>
+                    </div>
+
+                    <!-- Eisenhower Matrix View -->
+                    <div class="view-content hidden" id="matrix-view">
+                        <div class="eisenhower-matrix">
+                            <div class="matrix-labels">
+                                <div class="matrix-y-label">IMPORTANT</div>
+                            </div>
+                            <div class="matrix-grid">
+                                <div class="matrix-quadrant q1" id="quadrant-do-first">
+                                    <div class="quadrant-header">🔥 DO FIRST</div>
+                                    <div class="quadrant-subtitle">Urgent & Important</div>
+                                    <div class="quadrant-tasks"></div>
+                                </div>
+                                <div class="matrix-quadrant q2" id="quadrant-schedule">
+                                    <div class="quadrant-header">📅 SCHEDULE</div>
+                                    <div class="quadrant-subtitle">Important, Not Urgent</div>
+                                    <div class="quadrant-tasks"></div>
+                                </div>
+                                <div class="matrix-quadrant q3" id="quadrant-delegate">
+                                    <div class="quadrant-header">👥 DELEGATE</div>
+                                    <div class="quadrant-subtitle">Urgent, Not Important</div>
+                                    <div class="quadrant-tasks"></div>
+                                </div>
+                                <div class="matrix-quadrant q4" id="quadrant-eliminate">
+                                    <div class="quadrant-header">🗑️ ELIMINATE</div>
+                                    <div class="quadrant-subtitle">Neither Urgent nor Important</div>
+                                    <div class="quadrant-tasks"></div>
+                                </div>
+                            </div>
+                            <div class="matrix-x-label">URGENT →</div>
+                        </div>
+                    </div>
+
+                    <!-- Dependency Graph View -->
+                    <div class="view-content hidden" id="graph-view">
+                        <div class="dependency-graph" id="dependency-graph">
+                            <div class="graph-header">
+                                <h3>Task Dependencies</h3>
+                                <div class="graph-legend">
+                                    <span class="legend-item"><span class="legend-dot normal"></span> Normal</span>
+                                    <span class="legend-item"><span class="legend-dot circular"></span> Circular Dependency</span>
+                                </div>
+                            </div>
+                            <div class="graph-container" id="graph-container"></div>
+                            <div class="graph-info" id="graph-info"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

@@ -14,6 +14,8 @@ const API_BASE_URL = window.location.hostname === '127.0.0.1' || window.location
 // State
 let tasks = [];
 let taskIdCounter = 1;
+let lastAnalysisResult = null;
+let currentView = 'list';
 
 // DOM Elements
 const elements = {
@@ -305,6 +307,7 @@ async function handleAnalyze() {
 function renderResults(data) {
     hideAllStates();
     elements.resultsContainer.classList.remove('hidden');
+    lastAnalysisResult = data;
     
     // Update meta
     elements.resultsMeta.textContent = `${data.tasks.length} tasks • ${data.strategy.replace('_', ' ')}`;
@@ -320,14 +323,55 @@ function renderResults(data) {
     // Render summary
     elements.summaryText.textContent = data.summary || 'Tasks analyzed and prioritized.';
     
-    // Render task cards
-    elements.resultsList.innerHTML = data.tasks.map((task, index) => {
+    // Set up view tabs
+    setupViewTabs();
+    
+    // Render all views
+    renderPriorityList(data.tasks);
+    renderEisenhowerMatrix(data.eisenhower_matrix);
+    renderDependencyGraph(data.dependency_graph);
+    
+    // Update learning stats
+    updateLearningStats();
+}
+
+// Setup view tabs
+function setupViewTabs() {
+    const tabs = document.querySelectorAll('.view-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const view = tab.dataset.view;
+            switchView(view);
+        });
+    });
+}
+
+// Switch between views
+function switchView(view) {
+    currentView = view;
+    
+    // Update tab states
+    document.querySelectorAll('.view-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.view === view);
+    });
+    
+    // Update view visibility
+    document.querySelectorAll('.view-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+    document.getElementById(`${view}-view`).classList.remove('hidden');
+}
+
+// Render Priority List with feedback buttons
+function renderPriorityList(tasks) {
+    const resultsList = document.getElementById('results-list');
+    resultsList.innerHTML = tasks.map((task, index) => {
         const rank = index + 1;
         const rankClass = rank <= 3 ? `rank-${rank}` : '';
         const priorityClass = `priority-${task.priority_level.toLowerCase()}`;
         
         return `
-            <div class="result-card" style="animation-delay: ${index * 0.1}s">
+            <div class="result-card" style="animation-delay: ${index * 0.1}s" data-task-id="${task.id}">
                 <div class="result-card-header">
                     <div class="result-card-rank ${rankClass}">${rank}</div>
                     <div class="result-card-info">
@@ -340,6 +384,7 @@ function renderResults(data) {
                             <span>⏱️ ${task.estimated_hours}h</span>
                             <span>⭐ ${task.importance}/10</span>
                             ${task.blocking_count > 0 ? `<span>🔗 Blocks ${task.blocking_count}</span>` : ''}
+                            ${task.working_days_until_due !== undefined ? `<span>📆 ${task.working_days_until_due} work days</span>` : ''}
                         </div>
                     </div>
                     <div class="result-card-score">
@@ -350,10 +395,182 @@ function renderResults(data) {
                 <div class="result-card-explanation">
                     ${escapeHtml(task.explanation)}
                 </div>
+                <div class="feedback-buttons">
+                    <button class="feedback-btn helpful" onclick="sendFeedback('${task.id}', true, this)">
+                        👍 Helpful
+                    </button>
+                    <button class="feedback-btn not-helpful" onclick="sendFeedback('${task.id}', false, this)">
+                        👎 Not Helpful
+                    </button>
+                </div>
             </div>
         `;
     }).join('');
 }
+
+// Render Eisenhower Matrix
+function renderEisenhowerMatrix(matrix) {
+    if (!matrix) return;
+    
+    const quadrants = {
+        'do_first': document.querySelector('#quadrant-do-first .quadrant-tasks'),
+        'schedule': document.querySelector('#quadrant-schedule .quadrant-tasks'),
+        'delegate': document.querySelector('#quadrant-delegate .quadrant-tasks'),
+        'eliminate': document.querySelector('#quadrant-eliminate .quadrant-tasks'),
+    };
+    
+    Object.entries(quadrants).forEach(([key, element]) => {
+        if (!element) return;
+        const tasks = matrix[key] || [];
+        
+        if (tasks.length === 0) {
+            element.innerHTML = '<div class="quadrant-task" style="opacity: 0.5; text-align: center;">No tasks</div>';
+        } else {
+            element.innerHTML = tasks.map(task => `
+                <div class="quadrant-task">
+                    <span class="quadrant-task-title">${escapeHtml(task.title)}</span>
+                    <span class="quadrant-task-score">${task.priority_score.toFixed(1)}</span>
+                </div>
+            `).join('');
+        }
+    });
+}
+
+// Render Dependency Graph
+function renderDependencyGraph(graph) {
+    const container = document.getElementById('graph-container');
+    const info = document.getElementById('graph-info');
+    
+    if (!graph || graph.total_edges === 0) {
+        container.innerHTML = `
+            <div class="no-dependencies">
+                <div class="no-dependencies-icon">🔗</div>
+                <p>No dependencies defined between tasks</p>
+            </div>
+        `;
+        info.innerHTML = '';
+        return;
+    }
+    
+    // Simple visualization using positioned divs
+    const nodes = graph.nodes;
+    const edges = graph.edges;
+    
+    // Calculate positions in a circle
+    const containerWidth = 500;
+    const containerHeight = 300;
+    const centerX = containerWidth / 2;
+    const centerY = containerHeight / 2;
+    const radius = Math.min(containerWidth, containerHeight) / 3;
+    
+    container.style.width = containerWidth + 'px';
+    container.style.height = containerHeight + 'px';
+    container.style.position = 'relative';
+    
+    // Position nodes in a circle
+    const nodePositions = {};
+    nodes.forEach((node, index) => {
+        const angle = (2 * Math.PI * index) / nodes.length - Math.PI / 2;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        nodePositions[node.id] = { x, y };
+    });
+    
+    // Render nodes
+    let html = '';
+    nodes.forEach(node => {
+        const pos = nodePositions[node.id];
+        const circularClass = node.in_cycle ? 'circular' : '';
+        html += `
+            <div class="graph-node ${circularClass}" 
+                 style="left: ${pos.x - 50}px; top: ${pos.y - 15}px; min-width: 100px; text-align: center;"
+                 title="${escapeHtml(node.title)}">
+                ${escapeHtml(node.title.substring(0, 15))}${node.title.length > 15 ? '...' : ''}
+            </div>
+        `;
+    });
+    
+    // Render edges (simplified - just show connections info)
+    container.innerHTML = html;
+    
+    // Show graph info
+    const circularWarning = graph.has_circular 
+        ? `<span style="color: var(--accent-red);">⚠️ Circular dependencies detected!</span><br>` 
+        : '';
+    
+    info.innerHTML = `
+        ${circularWarning}
+        <strong>${graph.total_nodes}</strong> tasks • 
+        <strong>${graph.total_edges}</strong> dependencies
+        ${graph.circular_dependencies.length > 0 
+            ? `<br>Cycles: ${graph.circular_dependencies.map(c => c.join(' → ')).join('; ')}` 
+            : ''}
+    `;
+}
+
+// Send feedback to learning system
+async function sendFeedback(taskId, wasHelpful, buttonElement) {
+    const taskData = lastAnalysisResult?.tasks.find(t => t.id === taskId);
+    if (!taskData) return;
+    
+    // Disable both buttons
+    const container = buttonElement.parentElement;
+    container.querySelectorAll('.feedback-btn').forEach(btn => {
+        btn.classList.add('submitted');
+        btn.disabled = true;
+    });
+    buttonElement.textContent = wasHelpful ? '👍 Thanks!' : '👎 Noted';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/feedback/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task: taskData,
+                was_helpful: wasHelpful
+            })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateLearningStats(data.statistics);
+        }
+    } catch (error) {
+        console.error('Failed to send feedback:', error);
+    }
+}
+
+// Update learning system stats display
+async function updateLearningStats(stats) {
+    const statsElement = document.getElementById('feedback-stats');
+    if (!statsElement) return;
+    
+    if (!stats) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/feedback/`);
+            if (response.ok) {
+                const data = await response.json();
+                stats = data.statistics;
+            }
+        } catch (error) {
+            statsElement.textContent = 'No feedback yet';
+            return;
+        }
+    }
+    
+    if (stats && stats.total_feedback > 0) {
+        const rate = (stats.helpful_rate * 100).toFixed(0);
+        statsElement.textContent = `${stats.total_feedback} feedback(s) • ${rate}% helpful`;
+        if (stats.is_learning) {
+            statsElement.textContent += ' • 🎓 Learning active';
+        }
+    } else {
+        statsElement.textContent = 'No feedback yet - rate suggestions to improve!';
+    }
+}
+
+// Make sendFeedback available globally
+window.sendFeedback = sendFeedback;
 
 // UI State Management
 function updateAnalyzeButton() {
