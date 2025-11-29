@@ -14,6 +14,7 @@ An intelligent task prioritization system that helps you decide what to work on 
 - ✅ **4 Sorting Strategies** - Smart Balance, Fastest Wins, High Impact, Deadline Driven
 - ✅ **Circular Dependency Detection** - Automatically detects and warns about task cycles
 - ✅ **Beautiful Dark UI** - Modern, responsive interface with color-coded priorities
+- ✅ **Custom Favicon** - Thunder emoji (⚡) favicon for brand identity
 
 ### Bonus Features (All Implemented!)
 - ✅ **Date Intelligence** - Excludes weekends and holidays from urgency calculation
@@ -85,6 +86,7 @@ An intelligent task prioritization system that helps you decide what to work on 
    - Open `frontend/index.html` in your browser
    - Or use a local server: `python -m http.server 5500 --directory frontend`
    - Then navigate to `http://localhost:5500`
+   - Note: The thunder emoji (⚡) favicon will appear in your browser tab
 
 ### Running Tests
 
@@ -380,7 +382,7 @@ SmartTaskAnalyzer/
 │   ├── admin.py             # Django admin config
 │   └── apps.py              # App configuration
 ├── frontend/                 # Frontend Application
-│   ├── index.html           # Main HTML (3 view tabs)
+│   ├── index.html           # Main HTML (3 view tabs, favicon)
 │   ├── styles.css           # CSS (dark theme, matrix, graph)
 │   └── script.js            # JavaScript (API, views, feedback)
 ├── docs/                     # GitHub Pages deployment
