@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Task Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">⚡</span>
+                    <h1>Smart Task Analyzer</h1>
+                </div>
+                <p class="tagline">Intelligent prioritization for maximum productivity</p>
+            </div>
+            <div class="header-pattern"></div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel - Input -->
+            <section class="panel input-panel">
+                <div class="panel-header">
+                    <h2>📝 Task Input</h2>
+                    <div class="input-toggle">
+                        <button class="toggle-btn active" data-mode="form">Form</button>
+                        <button class="toggle-btn" data-mode="json">JSON</button>
+                    </div>
+                </div>
+
+                <!-- Form Input Mode -->
+                <div class="input-mode" id="form-mode">
+                    <form id="task-form" class="task-form">
+                        <div class="form-group">
+                            <label for="task-title">Task Title *</label>
+                            <input type="text" id="task-title" placeholder="e.g., Fix login bug" required>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="due-date">Due Date *</label>
+                                <input type="date" id="due-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="estimated-hours">Est. Hours *</label>
+                                <input type="number" id="estimated-hours" min="1" max="100" placeholder="4" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="importance">Importance: <span id="importance-value">5</span>/10</label>
+                            <input type="range" id="importance" min="1" max="10" value="5">
+                            <div class="importance-labels">
+                                <span>Low</span>
+                                <span>High</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dependencies">Dependencies (comma-separated IDs)</label>
+                            <input type="text" id="dependencies" placeholder="e.g., task-1, task-2">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-add">
+                            <span>➕</span> Add Task
+                        </button>
+                    </form>
+
+                    <!-- Task List -->
+                    <div class="task-list-section">
+                        <div class="task-list-header">
+                            <h3>Added Tasks (<span id="task-count">0</span>)</h3>
+                            <button class="btn btn-text" id="clear-tasks">Clear All</button>
+                        </div>
+                        <ul class="task-list" id="task-list"></ul>
+                    </div>
+                </div>
+
+                <!-- JSON Input Mode -->
+                <div class="input-mode hidden" id="json-mode">
+                    <div class="form-group">
+                        <label for="json-input">Paste JSON Array of Tasks</label>
+                        <textarea id="json-input" placeholder='[
+  {
+    "id": "task-1",
+    "title": "Fix login bug",
+    "due_date": "2025-11-30",
+    "estimated_hours": 3,
+    "importance": 8,
+    "dependencies": []
+  }
+]'></textarea>
+                    </div>
+                    <button class="btn btn-secondary" id="parse-json">Parse JSON</button>
+                </div>
+
+                <!-- Strategy Selection -->
+                <div class="strategy-section">
+                    <h3>🎯 Sorting Strategy</h3>
+                    <div class="strategy-grid">
+                        <label class="strategy-option selected">
+                            <input type="radio" name="strategy" value="smart_balance" checked>
+                            <div class="strategy-card">
+                                <span class="strategy-icon">⚖️</span>
+                                <span class="strategy-name">Smart Balance</span>
+                                <span class="strategy-desc">Balanced approach</span>
+                            </div>
+                        </label>
+                        <label class="strategy-option">
+                            <input type="radio" name="strategy" value="fastest_wins">
+                            <div class="strategy-card">
+                                <span class="strategy-icon">⚡</span>
+                                <span class="strategy-name">Fastest Wins</span>
+                                <span class="strategy-desc">Quick tasks first</span>
+                            </div>
+                        </label>
+                        <label class="strategy-option">
+                            <input type="radio" name="strategy" value="high_impact">
+                            <div class="strategy-card">
+                                <span class="strategy-icon">🎯</span>
+                                <span class="strategy-name">High Impact</span>
+                                <span class="strategy-desc">Most important first</span>
+                            </div>
+                        </label>
+                        <label class="strategy-option">
+                            <input type="radio" name="strategy" value="deadline_driven">
+                            <div class="strategy-card">
+                                <span class="strategy-icon">📅</span>
+                                <span class="strategy-name">Deadline Driven</span>
+                                <span class="strategy-desc">Urgent deadlines first</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Analyze Button -->
+                <button class="btn btn-primary btn-analyze" id="analyze-btn" disabled>
+                    <span class="btn-icon">🔍</span>
+                    <span class="btn-text">Analyze Tasks</span>
+                    <span class="loading-spinner hidden"></span>
+                </button>
+            </section>
+
+            <!-- Right Panel - Results -->
+            <section class="panel results-panel">
+                <div class="panel-header">
+                    <h2>📊 Priority Results</h2>
+                    <div class="results-meta" id="results-meta"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state" id="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <h3>No Results Yet</h3>
+                    <p>Add tasks and click "Analyze Tasks" to see prioritized results</p>
+                </div>
+
+                <!-- Loading State -->
+                <div class="loading-state hidden" id="loading-state">
+                    <div class="loading-animation">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
+                    <p>Analyzing tasks...</p>
+                </div>
+
+                <!-- Error State -->
+                <div class="error-state hidden" id="error-state">
+                    <div class="error-icon">⚠️</div>
+                    <h3>Error</h3>
+                    <p id="error-message"></p>
+                    <button class="btn btn-secondary" id="retry-btn">Retry</button>
+                </div>
+
+                <!-- Results List -->
+                <div class="results-container hidden" id="results-container">
+                    <!-- Warnings -->
+                    <div class="warnings-section hidden" id="warnings-section">
+                        <div class="warning-banner">
+                            <span class="warning-icon">⚠️</span>
+                            <div class="warning-content" id="warnings-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="summary-card" id="summary-card">
+                        <div class="summary-icon">💡</div>
+                        <p id="summary-text"></p>
+                    </div>
+
+                    <!-- Prioritized Tasks -->
+                    <div class="results-list" id="results-list"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Smart Task Analyzer • Built for intelligent productivity</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+

@@ -13,7 +13,7 @@ SECRET_KEY = 'django-insecure-smart-task-analyzer-dev-key-change-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.pythonanywhere.com', '.github.io']
 
 # Application definition
 INSTALLED_APPS = [
@@ -113,8 +113,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
+    "https://marlness.github.io",
 ]
 
 # Also allow all origins in development
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Static files for production
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
