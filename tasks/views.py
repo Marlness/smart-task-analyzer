@@ -20,7 +20,7 @@ from .serializers import (
     TaskInputSerializer,
     TaskOutputSerializer,
 )
-from .scoring import analyze_tasks, get_suggestions
+from .scoring import analyze_tasks, get_suggestions, learning_system
 
 
 class AnalyzeTasksView(APIView):
@@ -295,5 +295,55 @@ class StrategiesView(APIView):
         return Response({
             'strategies': strategies,
             'default': 'smart_balance'
+        })
+
+
+class FeedbackView(APIView):
+    """
+    POST /api/tasks/feedback/
+    
+    Record user feedback for learning system.
+    Allows users to mark if suggested tasks were helpful.
+    """
+    
+    def post(self, request):
+        """Record feedback for a task suggestion."""
+        try:
+            data = request.data
+            task_data = data.get('task', {})
+            was_helpful = data.get('was_helpful', True)
+            
+            if not task_data:
+                return Response(
+                    {'error': 'Task data is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Record feedback
+            stats = learning_system.record_feedback(task_data, was_helpful)
+            
+            return Response({
+                'message': 'Feedback recorded successfully',
+                'statistics': stats
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to record feedback: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def get(self, request):
+        """Get learning system statistics."""
+        return Response({
+            'statistics': learning_system.get_statistics()
+        })
+    
+    def delete(self, request):
+        """Reset learning system data."""
+        stats = learning_system.reset()
+        return Response({
+            'message': 'Learning system reset',
+            'statistics': stats
         })
 
